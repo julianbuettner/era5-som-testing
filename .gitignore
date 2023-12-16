@@ -1,0 +1,10 @@
+# Venvs
+venv/
+
+# Datasets
+*.grib
+
+# Images
+*.png
+*.jpeg
+*.jpg
