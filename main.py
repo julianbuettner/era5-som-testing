@@ -1,3 +1,4 @@
+from time import sleep
 from matplotlib.offsetbox import AnchoredText
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,16 +18,36 @@ harvest = np.array([[0.8, 2.4, 2.5, 3.9, 0.0, 4.0, 0.0],
 harvest = np.random.rand(100, 100)
 harvest = np.random.rand(COORDS[1] - COORDS[0], COORDS[3] - COORDS[2])
 
-def plotting(ax, data):
-    width = len(data[0])
-    height = len(data)
-    x_range = (COORDS[1] - COORDS[0])
-    y_range =  (COORDS[3] - COORDS[2])
-    x = [(i + 0.5) / width * x_range + COORDS[0] for i in range(width)]
-    y = [(i + 0.5) / width * y_range + COORDS[2] for i in range(height)]
-    print(x)
-    print(y)
-    ax.pcolor(x, y, data)
+
+def plotting(ax, da: xr.DataArray, index=0):
+    # width = len(data[0])
+    # height = len(data)
+    # x_range = (COORDS[1] - COORDS[0])
+    # y_range =  (COORDS[3] - COORDS[2])
+    # print(x)
+    # print(y)
+    # print(da.values[0])
+    x = da.coords["latitude"].values
+    y = da.coords["longitude"].values
+    print("Dim:", len(x) * len(y))
+    # print(x, y, da.values[index].shape)
+    # X, Y = np.meshgrid(da.coords["latitude"].values, da.coords["longitude"].values)
+    ax.pcolormesh(
+        [yy for yy in y],
+        [xx for xx in x],
+        # da.values[0],
+        da.values[index][:-1, :-1],
+        shading='nearest',
+    )
+
+def model_plot(model)
+
+
+def resample(a: xr.Dataset):
+    a = a.resample(time="1D").mean()
+    a = a.coarsen(longitude=4, boundary='trim').mean()
+    a = a.coarsen(latitude=4, boundary='trim').mean()
+    return a
 
 
 def main():
@@ -54,15 +75,26 @@ def main():
     )
     # ax.add_artist(text)
 
-    data = xr.load_dataset("geopot_93-22.grib")
-    plot = data.t2m[0].plot(
-        cmap=plt.cm.coolwarm, transform=ccrs.PlateCarree()
-    )
+    data = xr.load_dataset("data500.nc")
+    # plot = data.t2m[0].plot(
+    #     cmap=plt.cm.coolwarm, transform=ccrs.PlateCarree()
+    # )
+    # print(data)
+    geopot = data["z"]
+    print(geopot.to_numpy().shape)
+    print("Normalize...")
+    geopot = resample(geopot)
+    print(geopot.to_numpy().shape)
+    # print(geopot)
+    # print(float(geopot.coords["latitude"][0]))
+    # print(geopot)
 
-    plotting(ax, harvest)
-
-    plt.show()
-    plt.savefig("/mnt/c/Users/Julian/Desktop/test.png")
+    for i in range(300):
+        plotting(ax, geopot, index=i)
+        # plt.sow(block=False)
+        plt.savefig("out.png")
+        sleep(1)
+    # plt.savefig("/mnt/c/Users/Julian/Desktop/test.png")
 
 
 if __name__ == "__main__":
