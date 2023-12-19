@@ -1,3 +1,4 @@
+import somoclu
 from time import sleep
 from matplotlib.offsetbox import AnchoredText
 import matplotlib.pyplot as plt
@@ -18,6 +19,7 @@ harvest = np.array([[0.8, 2.4, 2.5, 3.9, 0.0, 4.0, 0.0],
 harvest = np.random.rand(100, 100)
 harvest = np.random.rand(COORDS[1] - COORDS[0], COORDS[3] - COORDS[2])
 
+IMAGE_PATH = "/mnt/c/Users/Julian/Desktop/test.png"
 
 def plotting(ax, da: xr.DataArray, index=0):
     # width = len(data[0])
@@ -40,7 +42,8 @@ def plotting(ax, da: xr.DataArray, index=0):
         shading='nearest',
     )
 
-def model_plot(model)
+def model_plot(model):
+    ...
 
 
 def resample(a: xr.Dataset):
@@ -75,25 +78,25 @@ def main():
     )
     # ax.add_artist(text)
 
-    data = xr.load_dataset("data500.nc")
-    # plot = data.t2m[0].plot(
-    #     cmap=plt.cm.coolwarm, transform=ccrs.PlateCarree()
-    # )
-    # print(data)
+    data = xr.load_dataset("test500.nc")
     geopot = data["z"]
     print(geopot.to_numpy().shape)
     print("Normalize...")
     geopot = resample(geopot)
-    print(geopot.to_numpy().shape)
-    # print(geopot)
-    # print(float(geopot.coords["latitude"][0]))
-    # print(geopot)
+    data_dim = geopot.to_numpy().shape
+    print("Datapoint dim", data_dim)
 
-    for i in range(300):
-        plotting(ax, geopot, index=i)
-        # plt.sow(block=False)
-        plt.savefig("out.png")
-        sleep(1)
+    model = somoclu.Somoclu(4, 4)
+    sample = geopot.to_numpy().reshape((data_dim[0], data_dim[1] * data_dim[2],))
+    print("Sample", sample.shape)
+    model.train(sample, epochs=10000)
+    # print("BMUs:", model.get)
+    model.view_umatrix(bestmatches=True, filename=IMAGE_PATH)
+
+    # for i in range(300):
+    #     plotting(ax, geopot, index=i)
+    #     plt.savefig("out.png")
+    #     sleep(1)
     # plt.savefig("/mnt/c/Users/Julian/Desktop/test.png")
 
 
