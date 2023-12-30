@@ -11,15 +11,16 @@ from itertools import product
 from random import randint
 
 IMAGE_PATH = "/mnt/c/Users/Julian/Desktop/test.png"
+IMAGE_PATH = "test.png"
 COORDS = None
 
 DATASET = "full500.nc"
-# DATASET = "test500.nc"
-TRAINING_STEPS = "/mnt/d/som/ani1/training_{:05}.png"
+DATASET = "data500.nc"
+TRAINING_STEPS = "ani1/training_{:05}.png"
 FIG_FAC = 2
 FIGSIZE = [6.4 * FIG_FAC, 4.8 * FIG_FAC]
 STEPS = 90 * 1000
-BATCHSIZE = 70
+BATCHSIZE = 110
 
 def plotting(ax, da: xr.DataArray, index=0):
     x = da.coords["latitude"].values
@@ -64,8 +65,8 @@ def model_plot(model, da: xr.DataArray):
             y,
             x,
             m,
-            vmin=50,
-            vmax=60,
+            vmin=0,
+            vmax=1,
             shading="nearest",
             cmap='jet',
         )
@@ -74,9 +75,10 @@ def model_plot(model, da: xr.DataArray):
 
 def resample(a: xr.Dataset):
     a = a.resample(time="1D").mean()
-    a = a.coarsen(longitude=4, boundary="trim").mean()
-    a = a.coarsen(latitude=4, boundary="trim").mean()
-    a = a / 1000
+    a = a.coarsen(longitude=4 * 4, boundary="trim").mean()
+    a = a.coarsen(latitude=4 * 4, boundary="trim").mean()
+    a = a / 1000 / 10
+    a -= 5
     return a
 
 def load_random_selection_of_data(size=1000):
@@ -84,7 +86,7 @@ def load_random_selection_of_data(size=1000):
     time_length = len(data["time"])
     time_start = randint(0, time_length - BATCHSIZE - 1)
     time_slice = slice(data["time"][time_start], data["time"][time_start + BATCHSIZE])
-    print("Time slice starting from", data["time"][time_start])
+    # print("Time slice starting from", data["time"][time_start].as_numpy())
     dataset = data.sel(time=time_slice)
     return resample(dataset)
 
@@ -115,7 +117,7 @@ def main():
     #     )
     # )
     model = MiniSom(4, 4, len(dataset.coords["latitude"]) * len(dataset.coords["longitude"]))
-    # model.pca_weights_init(sample[:4])
+    # model.pca_weights_init(dataset["z"].to_numpy()[:4])
     print("Train")
 
     for i in range(STEPS):
@@ -127,7 +129,7 @@ def main():
             print("Step {}/{}".format(i, STEPS))
             fig = model_plot(model.get_weights(), dataset)
             fig.savefig(TRAINING_STEPS.format(i))
-        if i % 1000 == BATCHSIZE / 2:
+        if i % 1000 == BATCHSIZE / 20:
             dataset = load_random_selection_of_data()
     return
 
