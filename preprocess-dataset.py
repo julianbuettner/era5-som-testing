@@ -15,8 +15,8 @@ SAMPLES_PER_DAY = 4
 
 def resample(a: xr.Dataset):
     a = a.resample(time="1D", skipna=True).mean()
-    a = a.coarsen(longitude=4 * 4, boundary="trim").mean()
-    a = a.coarsen(latitude=4 * 4, boundary="trim").mean()
+    a = a.coarsen(longitude=2 * 2, boundary="trim").mean()
+    a = a.coarsen(latitude=2 * 2, boundary="trim").mean()
     return a
 
 def load_dataset():

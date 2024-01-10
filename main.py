@@ -13,6 +13,7 @@ from itertools import product
 from random import randint
 from multiprocessing import Queue, Process
 from pickle import dump, load
+from parse_be_csv import get_bes
 
 IMAGE_PATH = "/mnt/c/Users/Julian/Desktop/test.png"
 # IMAGE_PATH = "test.png"
@@ -23,11 +24,14 @@ DATASET = "resampled.nc"
 TRAINING_STEPS = "ani1/epoche_{:04}.png"
 TRAINING_STEPS = "/mnt/d/som/ani1/epoche_{:02}_step_{:06}.png"
 ERROR_FILE = "/mnt/d/som/ani1-{}-error.png"
+HEATMAP_TOTAL = "/mnt/d/som/heatmap-complete-dataset.png"
+HEATMAP_BE = "/mnt/d/som/heatmap-be.png"
+HEATMAP_RECENTLY = "/mnt/d/som/heatmap-2017-2022.png"
 FIG_FAC = 2
 FIGSIZE = [6.4 * FIG_FAC, 4.8 * FIG_FAC]
-STEPS = 90 * 1000
-EPOCHS = 3
+EPOCHS = 1
 STEP_PLOT_INTERVAL = 5  # 1 to plot every epoche
+STEP_MODEL_FRAME_INTERVAL = 50
 RENDERING_PROCESSES = 10
 
 
@@ -42,11 +46,11 @@ def plot_errors(filename, title, errors):
 
 
 def plot_heat(sample_counts):
-    fig = plt.figure(7827812, figsize=FIGSIZE)
-    plt.imshow(sample_counts, cmap="hot", interpolation="nearest")
+    fig = plt.figure(np.random.randint(0, 9999999999), figsize=FIGSIZE)
     average = np.average(sample_counts)
-    minimum = np.minimum(sample_counts)
+    minimum = np.min(sample_counts)
     maximum = np.max(sample_counts)
+    plt.imshow(sample_counts, cmap="hot", interpolation="nearest", vmin=minimum - 20, vmax=maximum + 20)
     for i in range(sample_counts.shape[0]):
         for j in range(sample_counts.shape[1]):
             color = "white"
@@ -60,8 +64,6 @@ def plot_heat(sample_counts):
                 va="center",
                 color=color,
                 fontsize=20,
-                vmin=minimum - 20,
-                vmax=maximum + 20,
             )
     plt.colorbar()
     ax = plt.gca()
@@ -87,6 +89,7 @@ def plotting(da: xr.Dataset, values):
         vmin=-2.5,
         vmax=2.5,
         shading="nearest",
+        cmap="jet",
     )
 
 
@@ -176,6 +179,7 @@ def main():
     )
     dataset_np = np.array(dataset["z"].as_numpy())
     print(dataset_np.shape)
+
     dataset_np = dataset_np.reshape(
         (dataset_np.shape[0], dataset_np.shape[1] * dataset_np.shape[2])
     )
@@ -221,8 +225,8 @@ def main():
     start = time()
     quant_errors = []
     topographic_errors = []
-    for epoche in []:  # range(EPOCHS):
-        # for epoche in range(EPOCHS):
+    # for epoche in []:  # range(EPOCHS):
+    for epoche in range(EPOCHS):
         samples = list(range(dataset_size))
         shuffle(samples)
         for i in range(len(samples)):
@@ -236,8 +240,6 @@ def main():
                 topographic_error = model.topographic_error(dataset_np)
                 quant_errors.append(quantization_error)
                 topographic_errors.append(topographic_error)
-                filename = TRAINING_STEPS.format(epoche, i)
-                # q.put((filename, model.get_weights()))
                 duration = time() - start
                 print()
                 print(f"Epoche {epoche}, step {i}, {duration:.2f}s. ", end="")
@@ -246,24 +248,59 @@ def main():
                     end="",
                     flush=True,
                 )
-    # plot_errors(ERROR_FILE.format("quant"), "Quantization Error", quant_errors)
-    # plot_errors(ERROR_FILE.format("quant-100"), "Quantization Error (Skip 100)", quant_errors[100:])
-    # plot_errors(ERROR_FILE.format("topo"), "Topographic Error", topographic_errors)
-    # plot_errors(ERROR_FILE.format("topo-100"), "Topographic Error (SKip 100)", topographic_errors[100:])
-    with open(MODEL_FILE, "rb") as f:
-        model = load(f)
-    with open(MODEL_FILE, "wb") as f:
-        dump(model, f)
+            if i % STEP_MODEL_FRAME_INTERVAL == 0:
+                filename = TRAINING_STEPS.format(epoche, i)
+                q.put((filename, model.get_weights()))
 
+    plot_errors(ERROR_FILE.format("quant"), "Quantization Error", quant_errors)
+    plot_errors(ERROR_FILE.format("quant-100"), "Quantization Error (Skip 100)", quant_errors[100:])
+    plot_errors(ERROR_FILE.format("topo"), "Topographic Error", topographic_errors)
+    plot_errors(ERROR_FILE.format("topo-100"), "Topographic Error (Skip 100)", topographic_errors[100:])
+    # with open(MODEL_FILE, "rb") as f:
+    #     model = load(f)
+    # with open(MODEL_FILE, "wb") as f:
+    #     dump(model, f)
+
+
+    # Total heatmap
     (width, height, _) = model.get_weights().shape
     count_heat = np.zeros((width, height), dtype=np.int32)
-    print(count_heat)
     for sample in dataset_np:
+        (x, y) = model.winner(sample.flatten())
+        count_heat[x, y] += 1
+    plot_heat(count_heat)
+    plt.savefig(HEATMAP_TOTAL)
+
+    # Blocking Event Heatmap
+    (width, height, _) = model.get_weights().shape
+    count_heat = np.zeros((width, height), dtype=np.int32)
+    for be in get_bes():
+        try:
+            day = dataset.sel(time=be)
+        except KeyError:
+            print("Warning, date", be, "not found in dataset")
+            continue
+        day_np = day["z"].to_numpy().flatten()
+        day_np -= average
+        day_np /= 1000
+        (x, y) = model.winner(day_np)
+        count_heat[x, y] += 1
+    plot_heat(count_heat)
+    plt.savefig(HEATMAP_BE)
+
+    # Heatmap of recent dates
+    (width, height, _) = model.get_weights().shape
+    count_heat = np.zeros((width, height), dtype=np.int32)
+    recent_years = dataset.sel(time=slice("2017-01-01", "2023-01-01"))
+    recent_years_np = recent_years["z"].as_numpy()
+    for sample in recent_years_np:
+        sample = sample.to_numpy().flatten()
+        sample -= average
+        sample /= 1000
         (x, y) = model.winner(sample)
         count_heat[x, y] += 1
-        print(count_heat)
     plot_heat(count_heat)
-    plt.savefig(IMAGE_PATH)
+    plt.savefig(HEATMAP_RECENTLY)
 
     for _ in rendering_processes:
         # Signal processes to terminate
