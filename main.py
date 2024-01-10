@@ -2,7 +2,7 @@ from time import sleep, time
 from matplotlib.offsetbox import AnchoredText
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy.random import shuffle
+from numpy.random import sample, shuffle
 from scipy.sparse import data
 import xarray as xr
 import cartopy.crs as ccrs
@@ -12,11 +12,13 @@ from xarray.core.dataarray import DataArray
 from itertools import product
 from random import randint
 from multiprocessing import Queue, Process
+from pickle import dump, load
 
 IMAGE_PATH = "/mnt/c/Users/Julian/Desktop/test.png"
-IMAGE_PATH = "test.png"
+# IMAGE_PATH = "test.png"
 COORDS = None
 
+MODEL_FILE = "model.som"
 DATASET = "resampled.nc"
 TRAINING_STEPS = "ani1/epoche_{:04}.png"
 TRAINING_STEPS = "/mnt/d/som/ani1/epoche_{:02}_step_{:06}.png"
@@ -24,7 +26,7 @@ ERROR_FILE = "/mnt/d/som/ani1-{}-error.png"
 FIG_FAC = 2
 FIGSIZE = [6.4 * FIG_FAC, 4.8 * FIG_FAC]
 STEPS = 90 * 1000
-EPOCHS = 2
+EPOCHS = 3
 STEP_PLOT_INTERVAL = 5  # 1 to plot every epoche
 RENDERING_PROCESSES = 10
 
@@ -37,6 +39,34 @@ def plot_errors(filename, title, errors):
     ax.set(xlabel="Sample count", ylabel=title, title=title)
     ax.grid()
     fig.savefig(filename)
+
+
+def plot_heat(sample_counts):
+    fig = plt.figure(7827812, figsize=FIGSIZE)
+    plt.imshow(sample_counts, cmap="hot", interpolation="nearest")
+    average = np.average(sample_counts)
+    minimum = np.minimum(sample_counts)
+    maximum = np.max(sample_counts)
+    for i in range(sample_counts.shape[0]):
+        for j in range(sample_counts.shape[1]):
+            color = "white"
+            if sample_counts[i, j] > average:
+                color = "black"
+            plt.text(
+                j,
+                i,
+                sample_counts[i, j],
+                ha="center",
+                va="center",
+                color=color,
+                fontsize=20,
+                vmin=minimum - 20,
+                vmax=maximum + 20,
+            )
+    plt.colorbar()
+    ax = plt.gca()
+    ax.axes.get_xaxis().set_visible(False)
+    ax.axes.get_yaxis().set_visible(False)
 
 
 def plotting(da: xr.Dataset, values):
@@ -66,6 +96,7 @@ def raise_for_nan_inf(ar: np.array):
     if not np.isfinite(ar).all():
         raise ValueError("Contains Inf")
 
+
 def model_plot(model, coordinates, mark=None):
     model = np.array(model)
     fig = plt.figure(345435, figsize=FIGSIZE)
@@ -86,7 +117,7 @@ def model_plot(model, coordinates, mark=None):
         ax = fig.add_subplot(gs[i, j], projection=ccrs.PlateCarree())
         if (i, j) == mark:
             print("Marker")
-            ax.set_facecolor('orange')
+            ax.set_facecolor("orange")
         ax.set_extent(COORDS, crs=ccrs.PlateCarree())
         ax.stock_img()
         ax.add_feature(cfeature.LAND)
@@ -110,6 +141,7 @@ def model_plot(model, coordinates, mark=None):
         )
     return fig
 
+
 def rendering_thread(q: Queue, coordinates):
     while True:
         qv = q.get()
@@ -120,10 +152,10 @@ def rendering_thread(q: Queue, coordinates):
         fig = model_plot(values, coordinates)
         fig.savefig(filename)
         duration = time() - start
-        short = filename.split('/')[-1]
-        short = '.'.join(short.split('.')[:-1])
+        short = filename.split("/")[-1]
+        short = ".".join(short.split(".")[:-1])
         print(f" [{short}-{duration:.2f}s] ", end="", flush=True)
-        
+
 
 def open_dataset():
     global COORDS
@@ -179,9 +211,8 @@ def main():
         for _ in range(RENDERING_PROCESSES)
     ]
     for p in rendering_processes:
-        p.start()
-
-
+        "Comment"
+        # p.start()
 
     print("Init PCA")
     model.pca_weights_init(dataset_np[:500])
@@ -190,7 +221,8 @@ def main():
     start = time()
     quant_errors = []
     topographic_errors = []
-    for epoche in []: #range(EPOCHS):
+    for epoche in []:  # range(EPOCHS):
+        # for epoche in range(EPOCHS):
         samples = list(range(dataset_size))
         shuffle(samples)
         for i in range(len(samples)):
@@ -211,12 +243,28 @@ def main():
                 print(f"Epoche {epoche}, step {i}, {duration:.2f}s. ", end="")
                 print(
                     f"Quantization: {quantization_error}; Topographic: {topographic_error}",
-                    end="", flush=True
+                    end="",
+                    flush=True,
                 )
-    plot_errors(ERROR_FILE.format("quant"), "Quantization Error", quant_errors)
-    plot_errors(ERROR_FILE.format("quant-100"), "Quantization Error (Skip 100)", quant_errors[100:])
-    plot_errors(ERROR_FILE.format("topo"), "Topographic Error", topographic_errors)
-    plot_errors(ERROR_FILE.format("topo-100"), "Topographic Error (SKip 100)", topographic_errors[100:])
+    # plot_errors(ERROR_FILE.format("quant"), "Quantization Error", quant_errors)
+    # plot_errors(ERROR_FILE.format("quant-100"), "Quantization Error (Skip 100)", quant_errors[100:])
+    # plot_errors(ERROR_FILE.format("topo"), "Topographic Error", topographic_errors)
+    # plot_errors(ERROR_FILE.format("topo-100"), "Topographic Error (SKip 100)", topographic_errors[100:])
+    with open(MODEL_FILE, "rb") as f:
+        model = load(f)
+    with open(MODEL_FILE, "wb") as f:
+        dump(model, f)
+
+    (width, height, _) = model.get_weights().shape
+    count_heat = np.zeros((width, height), dtype=np.int32)
+    print(count_heat)
+    for sample in dataset_np:
+        (x, y) = model.winner(sample)
+        count_heat[x, y] += 1
+        print(count_heat)
+    plot_heat(count_heat)
+    plt.savefig(IMAGE_PATH)
+
     for _ in rendering_processes:
         # Signal processes to terminate
         q.put(None)
@@ -224,7 +272,6 @@ def main():
         p.join()
     return
 
-    
 
 if __name__ == "__main__":
     main()
