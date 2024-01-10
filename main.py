@@ -27,19 +27,21 @@ ERROR_FILE = "/mnt/d/som/ani1-{}-error.png"
 HEATMAP_TOTAL = "/mnt/d/som/heatmap-complete-dataset.png"
 HEATMAP_BE = "/mnt/d/som/heatmap-be.png"
 HEATMAP_RECENTLY = "/mnt/d/som/heatmap-2017-2022.png"
+FINAL_MODEL = "/mnt/d/som/final-model-weights.png"
 FIG_FAC = 2
 FIGSIZE = [6.4 * FIG_FAC, 4.8 * FIG_FAC]
-EPOCHS = 1
-STEP_PLOT_INTERVAL = 5  # 1 to plot every epoche
+EPOCHS = 3
+STEP_ERROR_PLOT_INTERVAL = 5  # 1 to plot every epoche
 STEP_MODEL_FRAME_INTERVAL = 50
-RENDERING_PROCESSES = 10
+RENDERING_PROCESSES = 4
 
 
 def plot_errors(filename, title, errors):
+    x_values = [i * STEP_ERROR_PLOT_INTERVAL for i in range(len(errors))]
     fig = plt.figure(887788, figsize=FIGSIZE)
     fig.clf()
     fig, ax = plt.subplots()
-    ax.plot(errors)
+    ax.plot(y=errors, x=x_values)
     ax.set(xlabel="Sample count", ylabel=title, title=title)
     ax.grid()
     fig.savefig(filename)
@@ -171,11 +173,15 @@ def open_dataset():
     ]
     return dataset
 
+def decay_function(learning_rate, t, max_iter):
+    original_learning_rate = learning_rate / (1+t/(max_iter/2))
+    return original_learning_rate ** 1.2
 
 def main():
     dataset = open_dataset()
     model = MiniSom(
-        4, 4, len(dataset.coords["latitude"]) * len(dataset.coords["longitude"])
+        4, 4, len(dataset.coords["latitude"]) * len(dataset.coords["longitude"]),
+        # decay_function=decay_function,
     )
     dataset_np = np.array(dataset["z"].as_numpy())
     print(dataset_np.shape)
@@ -216,7 +222,7 @@ def main():
     ]
     for p in rendering_processes:
         "Comment"
-        # p.start()
+        p.start()
 
     print("Init PCA")
     model.pca_weights_init(dataset_np[:500])
@@ -235,7 +241,7 @@ def main():
             sample = dataset_np[index]
             raise_for_nan_inf(sample)
             model.update(sample, model.winner(sample), step, EPOCHS * dataset_size)
-            if i % STEP_PLOT_INTERVAL == 0:
+            if i % STEP_ERROR_PLOT_INTERVAL == 0:
                 quantization_error = model.quantization_error(dataset_np)
                 topographic_error = model.topographic_error(dataset_np)
                 quant_errors.append(quantization_error)
@@ -251,18 +257,27 @@ def main():
             if i % STEP_MODEL_FRAME_INTERVAL == 0:
                 filename = TRAINING_STEPS.format(epoche, i)
                 q.put((filename, model.get_weights()))
-
+            # if i == 30:
+            #     break
+    print("Plot final weights")
+    fig = model_plot(model.get_weights(), dataset.coords)
+    fig.savefig(FINAL_MODEL)
+    print("Plot errors")
     plot_errors(ERROR_FILE.format("quant"), "Quantization Error", quant_errors)
     plot_errors(ERROR_FILE.format("quant-100"), "Quantization Error (Skip 100)", quant_errors[100:])
     plot_errors(ERROR_FILE.format("topo"), "Topographic Error", topographic_errors)
     plot_errors(ERROR_FILE.format("topo-100"), "Topographic Error (Skip 100)", topographic_errors[100:])
     # with open(MODEL_FILE, "rb") as f:
     #     model = load(f)
-    # with open(MODEL_FILE, "wb") as f:
-    #     dump(model, f)
-
+    with open(MODEL_FILE, "wb") as f:
+        try:
+            dump(model.get_weights(), f)
+        except Exception as e:
+            print("ERROR")
+            print(e)
 
     # Total heatmap
+    print("Plot", HEATMAP_TOTAL)
     (width, height, _) = model.get_weights().shape
     count_heat = np.zeros((width, height), dtype=np.int32)
     for sample in dataset_np:
@@ -272,6 +287,7 @@ def main():
     plt.savefig(HEATMAP_TOTAL)
 
     # Blocking Event Heatmap
+    print("Plot", HEATMAP_BE)
     (width, height, _) = model.get_weights().shape
     count_heat = np.zeros((width, height), dtype=np.int32)
     for be in get_bes():
@@ -289,12 +305,15 @@ def main():
     plt.savefig(HEATMAP_BE)
 
     # Heatmap of recent dates
+    print("Plot", HEATMAP_RECENTLY)
     (width, height, _) = model.get_weights().shape
     count_heat = np.zeros((width, height), dtype=np.int32)
     recent_years = dataset.sel(time=slice("2017-01-01", "2023-01-01"))
     recent_years_np = recent_years["z"].as_numpy()
     for sample in recent_years_np:
         sample = sample.to_numpy().flatten()
+        if np.isnan(sample).any():
+            continue
         sample -= average
         sample /= 1000
         (x, y) = model.winner(sample)
