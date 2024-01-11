@@ -14,6 +14,7 @@ DATASET = "full500.nc"
 # DATASET = "data500.nc"
 SAMPLES_PER_DAY = 4
 
+
 def resample(a: xr.Dataset):
     a = a.resample(time="1D", skipna=True).mean()
     a = a.coarsen(longitude=4, boundary="trim").mean()
@@ -23,6 +24,7 @@ def resample(a: xr.Dataset):
     a["z"].attrs["long_name"] = "Geopotential height"
     a["z"].attrs["standard_name"] = "Geopotential height"
     return a
+
 
 def load_dataset():
     data = xr.open_dataset(DATASET)
@@ -53,6 +55,7 @@ def main():
     print(f"Ok: {count_ok}, skipped: {count_nan_inf}")
 
     dataset.to_netcdf("resampled.nc")
+
 
 if __name__ == "__main__":
     main()

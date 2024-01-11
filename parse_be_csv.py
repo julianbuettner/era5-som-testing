@@ -6,12 +6,14 @@ GTD_FILE = "GTD_labelling_ERA5_JJAextd_1979-2019.csv"
 DATE_FORMAT = "%d-%m-%Y"
 XARRAY_DATE_FORMAT = "%Y-%m-%d"
 
+
 def is_num(s: str) -> bool:
     try:
         int(s)
         return True
     except ValueError:
         return False
+
 
 def get_bes():
     result = []
@@ -36,7 +38,8 @@ def get_bes():
                 from_date += timedelta(days=1)
     return result
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     bis = get_bes()
     print(f"Found {len(bis)} BEs")
     print(bis[:15])

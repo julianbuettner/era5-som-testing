@@ -53,7 +53,13 @@ def plot_heat(sample_counts):
     average = np.average(sample_counts)
     minimum = np.min(sample_counts)
     maximum = np.max(sample_counts)
-    plt.imshow(sample_counts, cmap="hot", interpolation="nearest", vmin=minimum - 20, vmax=maximum + 20)
+    plt.imshow(
+        sample_counts,
+        cmap="hot",
+        interpolation="nearest",
+        vmin=minimum - 20,
+        vmax=maximum + 20,
+    )
     for i in range(sample_counts.shape[0]):
         for j in range(sample_counts.shape[1]):
             color = "white"
@@ -94,7 +100,9 @@ def plotting(da: xr.Dataset, values):
         shading="nearest",
         cmap="jet",
     )
-    cb = plt.colorbar(pcm, pad=0.05, label="Abweichung (100m)", location="bottom", shrink=0.5)
+    cb = plt.colorbar(
+        pcm, pad=0.05, label="Abweichung (100m)", location="bottom", shrink=0.5
+    )
     # cb.set_label("Abweichung (m)", size=20)
 
 
@@ -176,14 +184,18 @@ def open_dataset():
     ]
     return dataset
 
+
 def decay_function(learning_rate, t, max_iter):
-    original_learning_rate = learning_rate / (1+t/(max_iter/2))
-    return original_learning_rate ** 1.1
+    original_learning_rate = learning_rate / (1 + t / (max_iter / 2))
+    return original_learning_rate**1.1
+
 
 def main():
     dataset = open_dataset()
     model = MiniSom(
-        4, 4, len(dataset.coords["latitude"]) * len(dataset.coords["longitude"]),
+        4,
+        4,
+        len(dataset.coords["latitude"]) * len(dataset.coords["longitude"]),
         sigma=0.6,
         decay_function=decay_function,
     )
@@ -268,10 +280,27 @@ def main():
     fig = model_plot(model.get_weights(), dataset.coords)
     fig.savefig(FINAL_MODEL)
     print("Plot errors")
-    plot_errors(ERROR_FILE.format("quant"), "Quantization Error (normalized)", "Average Deviation (100m)", quant_errors)
-    plot_errors(ERROR_FILE.format("quant-100"), "Quantization Error (Skip 50)", "Average Deviation (100m)", quant_errors[10:])
-    plot_errors(ERROR_FILE.format("topo"), "Topographic Error", "Ratio", topographic_errors)
-    plot_errors(ERROR_FILE.format("topo-100"), "Topographic Error (Skip 50)", "Ratio", topographic_errors[10:])
+    plot_errors(
+        ERROR_FILE.format("quant"),
+        "Quantization Error (normalized)",
+        "Average Deviation (100m)",
+        quant_errors,
+    )
+    plot_errors(
+        ERROR_FILE.format("quant-100"),
+        "Quantization Error (Skip 50)",
+        "Average Deviation (100m)",
+        quant_errors[10:],
+    )
+    plot_errors(
+        ERROR_FILE.format("topo"), "Topographic Error", "Ratio", topographic_errors
+    )
+    plot_errors(
+        ERROR_FILE.format("topo-100"),
+        "Topographic Error (Skip 50)",
+        "Ratio",
+        topographic_errors[10:],
+    )
     # with open(MODEL_FILE, "rb") as f:
     #     model = load(f)
     with open(MODEL_FILE, "wb") as f:

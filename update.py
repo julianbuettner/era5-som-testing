@@ -10,14 +10,17 @@ BMU_FILE = "/mnt/d/som/update/bmu.txt"
 
 AVERAGE = None
 
+
 def init_normalize(full_dataset_np):
     global AVERAGE
     AVERAGE = np.average(full_dataset_np, axis=0)
+
 
 def normalize(data):
     data -= AVERAGE
     data /= 100
     return data
+
 
 def get_dataset_np(dataset):
     dataset_np = np.array(dataset["z"].as_numpy())
@@ -31,6 +34,7 @@ def get_dataset_np(dataset):
     ]
     dataset_np = np.array(dataset_filtered)
     return dataset_np
+
 
 def get_model_pretrained():
     dataset = open_dataset()
@@ -68,7 +72,7 @@ def main():
     hot_day_numpy = hot_day.to_numpy()
     model = get_model_pretrained()
 
-    plotting(dataset, (hot_day_numpy - AVERAGE) / 100 )
+    plotting(dataset, (hot_day_numpy - AVERAGE) / 100)
     plt.savefig(FILENAME_SAMPLE)
 
     model_plot(model.get_weights(), dataset.coords)
@@ -85,6 +89,5 @@ def main():
     plt.savefig(FILENAME_MODELE_AFTER)
 
 
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
