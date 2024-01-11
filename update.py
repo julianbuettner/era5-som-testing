@@ -16,7 +16,7 @@ def init_normalize(full_dataset_np):
 
 def normalize(data):
     data -= AVERAGE
-    data /= 1000
+    data /= 100
     return data
 
 def get_dataset_np(dataset):
@@ -68,7 +68,7 @@ def main():
     hot_day_numpy = hot_day.to_numpy()
     model = get_model_pretrained()
 
-    plotting(dataset, (hot_day_numpy - AVERAGE) / 1000 )
+    plotting(dataset, (hot_day_numpy - AVERAGE) / 100 )
     plt.savefig(FILENAME_SAMPLE)
 
     model_plot(model.get_weights(), dataset.coords)
@@ -76,7 +76,7 @@ def main():
 
     sample = hot_day_numpy.flatten()
     sample -= AVERAGE.flatten()
-    sample /= 1000
+    sample /= 100
     bmu = model.winner(sample)
     with open(BMU_FILE, mode="w") as f:
         f.write(str(bmu))

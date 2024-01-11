@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 
 import numpy as np
 import xarray as xr
@@ -34,10 +35,9 @@ def load_dataset():
 def main():
     global COORDS
     dataset = load_dataset()
-    print(dataset["z"])
-    return
 
     dataset_np = dataset["z"].as_numpy()
+    print("Dataset shape", dataset_np.shape)
     count_ok = 0
     count_nan_inf = 0
     print("Counting ok layers...")

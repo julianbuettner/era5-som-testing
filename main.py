@@ -178,7 +178,7 @@ def open_dataset():
 
 def decay_function(learning_rate, t, max_iter):
     original_learning_rate = learning_rate / (1+t/(max_iter/2))
-    return original_learning_rate ** 1.2
+    return original_learning_rate ** 1.1
 
 def main():
     dataset = open_dataset()
@@ -207,7 +207,7 @@ def main():
     average = np.average(dataset_np, axis=0)
     for layer in dataset_np:
         layer -= average
-    dataset_np /= 1000
+    dataset_np /= 100
     print("Max:", np.max(dataset_np), "Min:", np.min(dataset_np))
     print("Train")
     # for point in dataset_np[:4]:
@@ -248,7 +248,7 @@ def main():
             if i % STEP_ERROR_PLOT_INTERVAL == 0:
                 quantization_error = model.quantization_error(dataset_np)
                 topographic_error = model.topographic_error(dataset_np)
-                normalized_quantization_error = quantization_error / (sample.shape[0]) * 100
+                normalized_quantization_error = quantization_error / (sample.shape[0])
                 quant_errors.append(normalized_quantization_error)
                 topographic_errors.append(topographic_error)
                 duration = time() - start
@@ -268,10 +268,10 @@ def main():
     fig = model_plot(model.get_weights(), dataset.coords)
     fig.savefig(FINAL_MODEL)
     print("Plot errors")
-    plot_errors(ERROR_FILE.format("quant"), "Quantization Error (normalized)", "Average Deviation (m)", quant_errors)
-    plot_errors(ERROR_FILE.format("quant-100"), "Quantization Error (Skip 100)", "Average Deviation (m)", quant_errors[100:])
-    plot_errors(ERROR_FILE.format("topo"), "Topographic Error", "Error", topographic_errors)
-    plot_errors(ERROR_FILE.format("topo-100"), "Topographic Error (Skip 100)", "Error", topographic_errors[100:])
+    plot_errors(ERROR_FILE.format("quant"), "Quantization Error (normalized)", "Average Deviation (100m)", quant_errors)
+    plot_errors(ERROR_FILE.format("quant-100"), "Quantization Error (Skip 50)", "Average Deviation (100m)", quant_errors[10:])
+    plot_errors(ERROR_FILE.format("topo"), "Topographic Error", "Ratio", topographic_errors)
+    plot_errors(ERROR_FILE.format("topo-100"), "Topographic Error (Skip 50)", "Ratio", topographic_errors[10:])
     # with open(MODEL_FILE, "rb") as f:
     #     model = load(f)
     with open(MODEL_FILE, "wb") as f:
@@ -299,7 +299,7 @@ def main():
             continue
         day_np = day["z"].to_numpy().flatten()
         day_np -= average
-        day_np /= 1000
+        day_np /= 100
         (x, y) = model.winner(day_np)
         count_heat[x, y] += 1
     plot_heat(count_heat)
@@ -316,7 +316,7 @@ def main():
         if np.isnan(sample).any():
             continue
         sample -= average
-        sample /= 1000
+        sample /= 100
         (x, y) = model.winner(sample)
         count_heat[x, y] += 1
     plot_heat(count_heat)
