@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from time import sleep, time
 from matplotlib.offsetbox import AnchoredText
 import matplotlib.pyplot as plt
@@ -30,19 +31,19 @@ HEATMAP_RECENTLY = "/mnt/d/som/heatmap-2017-2022.png"
 FINAL_MODEL = "/mnt/d/som/final-model-weights.png"
 FIG_FAC = 2
 FIGSIZE = [6.4 * FIG_FAC, 4.8 * FIG_FAC]
-EPOCHS = 3
+EPOCHS = 2
 STEP_ERROR_PLOT_INTERVAL = 5  # 1 to plot every epoche
 STEP_MODEL_FRAME_INTERVAL = 50
-RENDERING_PROCESSES = 4
+RENDERING_PROCESSES = 2
 
 
-def plot_errors(filename, title, errors):
+def plot_errors(filename, title, y_axis_label, errors):
     x_values = [i * STEP_ERROR_PLOT_INTERVAL for i in range(len(errors))]
     fig = plt.figure(887788, figsize=FIGSIZE)
     fig.clf()
     fig, ax = plt.subplots()
-    ax.plot(y=errors, x=x_values)
-    ax.set(xlabel="Sample count", ylabel=title, title=title)
+    ax.plot(x_values, errors)
+    ax.set(xlabel="Sample count", ylabel=y_axis_label, title=title)
     ax.grid()
     fig.savefig(filename)
 
@@ -74,7 +75,7 @@ def plot_heat(sample_counts):
 
 
 def plotting(da: xr.Dataset, values):
-    fig = plt.figure(6723489, figsize=FIGSIZE)
+    fig = plt.figure(6723489)  # No figsize
     fig.clf()
     ax = fig.add_subplot(1, 1, 1, projection=ccrs.PlateCarree())
     ax.set_extent(COORDS, crs=ccrs.PlateCarree())
@@ -84,7 +85,7 @@ def plotting(da: xr.Dataset, values):
     ax.coastlines(resolution="50m")
     x = da.coords["latitude"].values
     y = da.coords["longitude"].values
-    ax.pcolormesh(
+    pcm = ax.pcolormesh(
         y,
         x,
         values,
@@ -93,6 +94,8 @@ def plotting(da: xr.Dataset, values):
         shading="nearest",
         cmap="jet",
     )
+    cb = plt.colorbar(pcm, pad=0.05, label="Abweichung (100m)", location="bottom", shrink=0.5)
+    # cb.set_label("Abweichung (m)", size=20)
 
 
 def raise_for_nan_inf(ar: np.array):
@@ -181,7 +184,8 @@ def main():
     dataset = open_dataset()
     model = MiniSom(
         4, 4, len(dataset.coords["latitude"]) * len(dataset.coords["longitude"]),
-        # decay_function=decay_function,
+        sigma=0.6,
+        decay_function=decay_function,
     )
     dataset_np = np.array(dataset["z"].as_numpy())
     print(dataset_np.shape)
@@ -244,13 +248,14 @@ def main():
             if i % STEP_ERROR_PLOT_INTERVAL == 0:
                 quantization_error = model.quantization_error(dataset_np)
                 topographic_error = model.topographic_error(dataset_np)
-                quant_errors.append(quantization_error)
+                normalized_quantization_error = quantization_error / (sample.shape[0]) * 100
+                quant_errors.append(normalized_quantization_error)
                 topographic_errors.append(topographic_error)
                 duration = time() - start
                 print()
                 print(f"Epoche {epoche}, step {i}, {duration:.2f}s. ", end="")
                 print(
-                    f"Quantization: {quantization_error}; Topographic: {topographic_error}",
+                    f"Quantization (normalized): {normalized_quantization_error}; Topographic: {topographic_error}",
                     end="",
                     flush=True,
                 )
@@ -263,18 +268,14 @@ def main():
     fig = model_plot(model.get_weights(), dataset.coords)
     fig.savefig(FINAL_MODEL)
     print("Plot errors")
-    plot_errors(ERROR_FILE.format("quant"), "Quantization Error", quant_errors)
-    plot_errors(ERROR_FILE.format("quant-100"), "Quantization Error (Skip 100)", quant_errors[100:])
-    plot_errors(ERROR_FILE.format("topo"), "Topographic Error", topographic_errors)
-    plot_errors(ERROR_FILE.format("topo-100"), "Topographic Error (Skip 100)", topographic_errors[100:])
+    plot_errors(ERROR_FILE.format("quant"), "Quantization Error (normalized)", "Average Deviation (m)", quant_errors)
+    plot_errors(ERROR_FILE.format("quant-100"), "Quantization Error (Skip 100)", "Average Deviation (m)", quant_errors[100:])
+    plot_errors(ERROR_FILE.format("topo"), "Topographic Error", "Error", topographic_errors)
+    plot_errors(ERROR_FILE.format("topo-100"), "Topographic Error (Skip 100)", "Error", topographic_errors[100:])
     # with open(MODEL_FILE, "rb") as f:
     #     model = load(f)
     with open(MODEL_FILE, "wb") as f:
-        try:
-            dump(model.get_weights(), f)
-        except Exception as e:
-            print("ERROR")
-            print(e)
+        dump(model.get_weights(), f)
 
     # Total heatmap
     print("Plot", HEATMAP_TOTAL)
@@ -294,7 +295,7 @@ def main():
         try:
             day = dataset.sel(time=be)
         except KeyError:
-            print("Warning, date", be, "not found in dataset")
+            # print("Warning, date", be, "not found in dataset")
             continue
         day_np = day["z"].to_numpy().flatten()
         day_np -= average

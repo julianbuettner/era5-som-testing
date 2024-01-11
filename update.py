@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 from matplotlib.pyplot import hot
 from numpy.random import choice
 from main import *

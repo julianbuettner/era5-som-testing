@@ -15,8 +15,12 @@ SAMPLES_PER_DAY = 4
 
 def resample(a: xr.Dataset):
     a = a.resample(time="1D", skipna=True).mean()
-    a = a.coarsen(longitude=8, boundary="trim").mean()
-    a = a.coarsen(latitude=8, boundary="trim").mean()
+    a = a.coarsen(longitude=4, boundary="trim").mean()
+    a = a.coarsen(latitude=4, boundary="trim").mean()
+    a["z"] /= 9.81
+    a["z"].attrs["units"] = "m"
+    a["z"].attrs["long_name"] = "Geopotential height"
+    a["z"].attrs["standard_name"] = "Geopotential height"
     return a
 
 def load_dataset():
@@ -31,6 +35,7 @@ def main():
     global COORDS
     dataset = load_dataset()
     print(dataset["z"])
+    return
 
     dataset_np = dataset["z"].as_numpy()
     count_ok = 0
